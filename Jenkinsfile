@@ -2,16 +2,11 @@ pipeline {
   agent none
   stages {
     stage('build') {
-      when {
-        anyOf {
-          branch 'main'
-          not { branch 'main' }
-        }
-      }
       agent {
         docker {
           image 'maven:3.9.6-eclipse-temurin-17'
         }
+
       }
       steps {
         echo 'compile maven app'
@@ -20,16 +15,11 @@ pipeline {
     }
 
     stage('test') {
-      when {
-        anyOf {
-          branch 'main'
-          not { branch 'main' }
-        }
-      }
       agent {
         docker {
           image 'maven:3.9.6-eclipse-temurin-17'
         }
+
       }
       steps {
         echo 'test maven app'
@@ -38,38 +28,40 @@ pipeline {
     }
 
     stage('package') {
-      when {
-        branch 'main'
-      }
-      agent {
-        docker {
-          image 'maven:3.9.6-eclipse-temurin-17'
+      parallel {
+        stage('package') {
+          agent {
+            docker {
+              image 'maven:3.9.6-eclipse-temurin-17'
+            }
+
+          }
+          steps {
+            echo 'package maven app'
+            sh 'mvn package -DskipTests'
+            archiveArtifacts 'target/*.jar'
+          }
         }
-      }
-      steps {
-        echo 'package maven app'
-        sh 'mvn package -DskipTests'
-        archiveArtifacts 'target/*.jar'
+
+        stage('Docker BnP') {
+          agent any
+          steps {
+            script {
+              docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
+                def commitHash = env.GIT_COMMIT.take(7)
+                def dockerImage = docker.build("deepthi3/sysfoo:${commitHash}", "./")
+                dockerImage.push()
+                dockerImage.push("latest")
+                dockerImage.push("dev")
+              }
+            }
+
+          }
+        }
+
       }
     }
 
-    stage('Docker BnP') {
-      when {
-        branch 'main'
-      }
-      agent {
-        docker {
-          image 'docker:24.0.7'
-          args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-      }
-      steps {
-        echo 'build and push docker image'
-        sh 'docker build -t my-app:latest .'
-        // Uncomment and configure the line below if pushing to a registry
-        // sh 'docker push my-app:latest'
-      }
-    }
   }
   tools {
     maven 'Maven 3.6.3'
