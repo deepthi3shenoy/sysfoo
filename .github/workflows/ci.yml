@@ -5,9 +5,9 @@ on:
     branches:
       - main
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:  # ✅ NEW: Enables manual triggering via GitHub Actions UI
     inputs:
-      image_tag:
+      image_tag:       # ✅ NEW: Optional input for Docker image tag
         description: 'Docker image tag'
         required: false
         default: 'latest'
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Determine Docker Tag
+      - name: Determine Docker Tag  # ✅ NEW: Get tag from manual input or default to 'latest'
         id: tag
         run: |
           CUSTOM_TAG="${{ github.event.inputs.image_tag }}"
@@ -108,10 +108,16 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Tag & Push Docker image
+      - name: Tag & Push Docker image  # ✅ MODIFIED: Tag with both input tag and 'latest'
         run: |
           COMMIT_HASH=$(echo ${{ github.sha }} | cut -c1-7)
           TAG=${{ steps.tag.outputs.tag }}
+
+          echo "Tagging image as: $TAG and latest"  # ✅ NEW: Print tag used
+
           docker tag docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:$COMMIT_HASH docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:$TAG
+          docker tag docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:$COMMIT_HASH docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:latest
+
           docker push docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:$COMMIT_HASH
           docker push docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:$TAG
+          docker push docker.io/${{ vars.DOCKERHUB_USERNAME }}/sysfoo:latest
