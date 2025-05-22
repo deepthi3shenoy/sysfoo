@@ -1,7 +1,12 @@
 pipeline {
-  agent any
+  agent none
   stages {
     stage('build') {
+      agent {
+        docker {
+          image 'maven:3.9.6-eclipse-temurin-17'
+        }
+      }
       steps {
         echo 'compile maven app'
         sh 'mvn compile'
@@ -9,6 +14,11 @@ pipeline {
     }
 
     stage('test') {
+      agent {
+        docker {
+          image 'maven:3.9.6-eclipse-temurin-17'
+        }
+      }
       steps {
         echo 'test maven app'
         sh 'mvn clean test'
@@ -16,6 +26,14 @@ pipeline {
     }
 
     stage('package') {
+      when {
+        branch 'main'
+      }
+      agent {
+        docker {
+          image 'maven:3.9.6-eclipse-temurin-17'
+        }
+      }
       steps {
         echo 'package maven app'
         sh 'mvn package -DskipTests'
@@ -23,7 +41,25 @@ pipeline {
       }
     }
 
+    stage('Docker BnP') {
+      when {
+        branch 'main'
+      }
+      agent any
+      steps {
+        script {
+          docker.withRegistry('https://index.docker.io/v1/', 'dockerlogin') {
+            def commitHash = env.GIT_COMMIT.take(7)
+            def dockerImage = docker.build("deepthi3/sysfoo:${commitHash}", "./")
+            dockerImage.push()
+            dockerImage.push("latest")
+            dockerImage.push("dev")
+          }
+        }
+      }
+    }
   }
+
   tools {
     maven 'Maven 3.6.3'
   }
